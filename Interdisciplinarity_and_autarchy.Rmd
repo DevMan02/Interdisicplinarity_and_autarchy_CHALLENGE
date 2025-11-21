@@ -29,9 +29,9 @@ library(dplyr)
 Analizzare il flusso di citazioni tra discipline per quantificare interdisciplinarità e autarchia, confrontando il flusso osservato ($F$) con il flusso atteso casualmente ($E$).
 
 ## Dataset (Input)
-* Nomi delle discipline (`disciplines.txt`)
-* Dimensione delle discipline (numero di paper, `size.txt`)
-* Matrice di flusso delle citazioni assolute ($F$) tra discipline (`flows.txt`)
+* Nomi delle discipline (`dataset/Disciplines`)
+* Dimensione delle discipline (numero di paper, `dataset/Size`)
+* Matrice di flusso delle citazioni assolute ($F$) tra discipline (`dataset/Flows`)
     * $F_{i,j}$ è il numero di citazioni dalla disciplina $i$ alla disciplina $j$.
 
 ## Challenge da Risolvere

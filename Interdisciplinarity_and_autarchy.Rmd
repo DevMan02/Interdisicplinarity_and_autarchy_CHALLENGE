@@ -1,0 +1,531 @@
+---
+title: "Interdisciplinaruty_And_Autarchity"
+author: "Devin mancardi"
+date: "2025-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,          # Mostra il codice nel documento finale
+    warning = FALSE,      # Nasconde i warning
+    message = FALSE,      # Nasconde i messaggi
+    # Dimensioni di default per la Heatmap e i Grafi
+    fig.width = 10,       # Larghezza predefinita di 10 pollici
+    fig.height = 10,      # Altezza predefinita di 10 pollici
+    dpi = 300             # Aumenta la risoluzione dell'immagine
+)
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+```
+
+
+# Interdisciplinarity and Autarchy in Science
+
+## Obiettivo
+Analizzare il flusso di citazioni tra discipline per quantificare interdisciplinarità e autarchia, confrontando il flusso osservato ($F$) con il flusso atteso casualmente ($E$).
+
+## Dataset (Input)
+* Nomi delle discipline (`disciplines.txt`)
+* Dimensione delle discipline (numero di paper, `size.txt`)
+* Matrice di flusso delle citazioni assolute ($F$) tra discipline (`flows.txt`)
+    * $F_{i,j}$ è il numero di citazioni dalla disciplina $i$ alla disciplina $j$.
+
+## Challenge da Risolvere
+
+1.  **Discipline Principali:** Identificare le discipline più **auto-citanti** e quelle **più citate** in generale.
+2.  **Normalizzazione:** Calcolare la matrice di flusso **atteso** ($E$), dove:
+    $$E_{i,j} = \frac{out_i \cdot in_j}{n}$$
+3.  **Visualizzazione:** Normalizzare e visualizzare la rete di flusso usando uno dei test:
+    * **X-test:** $$(F - E) / \sqrt{E}$$
+    * **G-test:** $$F \cdot \log(F / E)$$
+4.  **Interdisciplinarità:** Calcolare l'indice di **Entropia Quadratica di Rao** per scoprire le discipline più
+interdisciplinari.
+
+## Funzione RAO
+
+```{r}
+rao = function(p, D) {
+  # Calcolo equivalente a p^T * D * p, gestendo p come vettore diagonale
+  x = diag(p) %*% D %*% diag(p) 
+  return(sum(c(x)))
+}
+```
+
+
+## 💻 Codice R per l'Importazione
+
+```{r}
+# Nomi delle discipline
+disc = scan("Disciplines", what = character(0), sep="\n")
+ndisc = length(disc)
+
+# Dimensione delle discipline (numero di paper)
+size_disc = scan("Size", what = numeric(0), sep="\n")
+
+# Matrice di flusso (entry in position (i,j) are citations from i to j)
+F = matrix(scan("Flows", what = numeric(0), sep=","), 
+           nrow = ndisc, ncol = ndisc, byrow = TRUE) # Assumiamo byrow = TRUE per default
+
+```
+
+## Challenge 1: Discipline più Citanti e Citati
+
+Il totale delle citazioni in uscita ($out_i$) per una disciplina $i$ si ottiene sommando gli elementi della sua riga.
+Il totale delle citazioni in entrata ($in_j$) per una disciplina $j$ si ottiene sommando gli elementi della sua colonna.
+```{r}
+# Calcola il vettore delle citazioni in ENTRATA (totale COLONNA) Considerando la diagonale
+in_flow = colSums(F)
+
+# Calcola il vettore delle citazioni in USCITA (totale RIGA) Considerando la diagonale
+out_flow = rowSums(F)
+
+print(in_flow[1])
+print(out_flow[1])
+```
+```{r}
+F_no_diag = F
+diag(F_no_diag) = 0
+# calcolo il vettore delle citazioni in entrata (TOTALE COLONNA) senza la diagonale
+in_flow_no_diag = colSums(F_no_diag)
+# calcolo il vettore delle citazioni in uscita (TOTALE RIGHE) senza la diagonale
+out_flow_no_diag = rowSums(F_no_diag)
+
+print(in_flow_no_diag[1])
+print(out_flow_no_diag[1])
+```
+
+```{r}
+#calcoliamo chi sono le discipline che si autocitano
+self_citations = diag(F)
+```
+
+```{r}
+# Creazione del DataFrame
+Discipline_summary = data.frame(
+    Disciplina = disc,
+    # COLONNE IN ENTRATA (IN)
+    In_Totale = in_flow,
+    In_Interdisciplinare = in_flow_no_diag,
+    
+    # COLONNA DIAGONALE
+    Autocitazioni = self_citations,
+    
+    # COLONNE IN USCITA (OUT)
+    Out_Totale = out_flow,
+    Out_Interdisciplinare = out_flow_no_diag
+)
+
+```
+```{r}
+# Trova la posizione (indice) del valore massimo tra le autocitazioni
+max_self_citing_index = which.max(self_citations)
+
+# Usa l'indice per trovare il nome della disciplina e il suo valore
+most_self_citing_discipline = disc[max_self_citing_index]
+self_cited_value = self_citations[max_self_citing_index]
+
+max_citing_index = which.max(in_flow_no_diag)
+
+# Usa l'indice per trovare il nome della disciplina e il suo valore
+most_citing_discipline = disc[max_citing_index]
+cited_value = in_flow_no_diag[max_citing_index]
+
+
+#print(paste("Disciplina più autocitante:", most_self_citing_discipline, "con", self_cited_value, "autocitazioni."))
+#print(paste("Disciplina più citata interdisciplinare:", most_citing_discipline, "con", cited_value, "citazioni."))
+
+#top 3 per categoria
+top_self_citing = Discipline_summary[order(-Discipline_summary$Autocitazioni), c("Disciplina", "Autocitazioni")]
+
+print(head(top_self_citing, n = 3))
+
+top_cited = Discipline_summary[order(-Discipline_summary$In_Interdisciplinare),c("Disciplina", "In_Interdisciplinare")]
+head(top_cited, n = 3)
+```
+```{r}
+# Creazione del grafico (ggplot2)
+ggplot(top_self_citing, aes(x = reorder(Disciplina,Autocitazioni), y = Autocitazioni)) +
+    geom_bar(stat = "identity", fill = "#E69F00") + # Colore arancione
+    coord_flip() + # Trasforma in barre orizzontali
+    labs(title = "Discipline più Autocitanti",
+         x = NULL, 
+         y = "Conteggio Autocitazioni") +
+    theme_minimal() +
+    scale_y_continuous(labels = scales::comma) # Formatta i numeri grandi
+ggsave("top3_autocitazioni.png", width = 8, height = 5)
+```
+
+```{r}
+# Creazione del grafico (ggplot2)
+ggplot(top_cited, aes(x = reorder(Disciplina, In_Interdisciplinare), y = In_Interdisciplinare)) +
+    geom_bar(stat = "identity", fill = "#E69F00") + # Colore arancione
+    coord_flip() + # Trasforma in barre orizzontali
+    labs(title = "Discipline più Citate",
+         x = NULL, 
+         y = "Conteggio Autocitazioni") +
+    theme_minimal() +
+    scale_y_continuous(labels = scales::comma) # Formatta i numeri grandi
+ggsave("top3_autocitazioni.png", width = 8, height = 5)
+```
+
+## Calcolo della matrice di flusso netto
+
+Il calcolo della Matrice di Flusso Netto (o Net Flow Matrix), ti permette di quantificare l'asimmetria del rapporto di citazione tra ogni coppia di discipline e identificare la direzione del flusso di conoscenza.
+```{r}
+# Calcola la matrice trasposta (F^T)
+F_trasposta = t(F)
+# Calcola la Matrice di Flusso Netto
+F_net = F - F_trasposta
+```
+
+Per $F_{Net}$, devi usare una scala di colori divergente (diverging color scale):Colore Positivo (es. Blu): Indica che la riga $i$ cita la colonna $j$ NETTAMENTE DI PIÙ (flusso verso $j$).Colore Negativo (es. Rosso): Indica che la colonna $j$ cita la riga $i$ NETTAMENTE DI PIÙ (flusso verso $i$).Colore Neutro (es. Bianco/Grigio Chiaro): Indica che il flusso è quasi simmetrico ($F_{i,j} \approx F_{j,i}$).
+
+```{r}
+# Assegna i nomi di riga e colonna alla matrice
+rownames(F_net) = disc
+colnames(F_net) = disc
+
+# Trasforma la matrice larga in un formato lungo (tidy data)
+F_net_long = melt(F_net)
+# Rinomina le colonne per chiarezza
+colnames(F_net_long) = c("Source", "Target", "Net_Flow")
+```
+
+essendo la matrice anti simmetrica, setto a 0 tutti gli elementi sotto la diagonale
+
+```{r}
+# 1. Crea una copia della matrice netta per la visualizzazione
+F_net_upper = F_net
+
+# 2. Imposta a zero tutti gli elementi nel triangolo inferiore
+# Il parametro diag=TRUE include anche la diagonale (anche se è già zero)
+F_net_upper[lower.tri(F_net_upper, diag = TRUE)] = 0
+
+# Trasforma la matrice larga in un formato lungo (tidy data)
+F_net_upper_long = melt(F_net_upper)
+# Rinomina le colonne per chiarezza
+colnames(F_net_upper_long) = c("Source", "Target", "Net_Flow")
+
+```
+Per capire in quale range ricade la maggior parte dei valori, la metrica più robusta da utilizzare è l'Intervallo Interquartile (Interquartile Range, IQR).L'IQR definisce il range di valori occupato dal 50% centrale dei tuoi dati e ti permette di ignorare gli estremi (gli outlier).Calcolo e InterpretazioneL'IQR è calcolato come la differenza tra il terzo quartile ($Q_3$) e il primo quartile ($Q_1$).$$\text{IQR} = Q_3 - Q_1$$$Q_1$ (Primo Quartile): Il valore al di sotto del quale ricade il $25\%$ dei dati.$Q_2$ (Mediana): Il valore al di sotto del quale ricade il $50\%$ dei dati (il centro).$Q_3$ (Terzo Quartile): Il valore al di sotto del quale ricade il $75\%$ dei dati.Cosa ti indica: I valori compresi tra $Q_1$ e $Q_3$ ($\text{da } Q_1 \text{ a } Q_3$) sono il cuore della tua distribuzione. Nel tuo caso, l'IQR ti direbbe tra quali valori di Flusso Netto ricade il $50\%$ delle interazioni.
+
+```{r}
+# Calcola i quartili (Q1, Q2, Q3) del Flusso Netto
+quartili_flusso = quantile(F_net_long$Net_Flow, probs = c(0.25, 0.50, 0.75))
+
+# Stampa i risultati
+print(quartili_flusso)
+
+
+L_percentile = quantile(abs(F_net_long$Net_Flow), probs = 0.95)
+print(L_percentile)
+```
+### GRAFICO CON LIMITE IMPOSTO AL PERCENTILE(95)
+Questo valore dice che solo un piccolo $5\%$ delle interazioni ha uno sbilanciamento di citazioni superiore a $\approx 25.000$ (in positivo o negativo).
+
+```{r}
+# Assumiamo che L_percentile sia 24843.19 e F_net_long sia il DataFrame completo (non filtrato dal triangolo)
+
+# Filtra le righe dove il valore assoluto del Flusso Netto supera il limite del 95° percentile.
+Outlier_Flows = F_net_long %>%
+    filter(abs(Net_Flow) > L_percentile) %>%
+    arrange(desc(abs(Net_Flow))) # Ordina dal flusso più estremo al meno estremo
+    
+# Seleziona le colonne di interesse per la visualizzazione
+Outlier_Flows = Outlier_Flows %>%
+    select(Source, Target, Net_Flow)
+```
+
+```{r}
+library(scales) #funzione squish
+
+ggplot(F_net_upper_long, aes(x = Target, y = Source, fill = Net_Flow)) + 
+    geom_tile() + 
+    
+    scale_fill_gradient2(
+        low = "red", mid = "white", high = "blue",
+        midpoint = 0, 
+        limit = c(-L_percentile, L_percentile),
+        # Schiaccia gli outlier sul colore più estremo ---
+        oob = scales::squish,  
+        # Manteniamo 'na.value = "white"' per il triangolo inferiore ---
+        na.value = "white",
+        # -------------------------------------------------------------------------
+        space = "Lab", name = "Flusso Netto (Differenza)"
+    ) +
+    # --- AGGIUNGI IL SECONDO GEOM (geom_point) per rendere chiara graficamente le intersezioni outlier
+    geom_point(data = F_net_upper_long %>% filter(abs(Net_Flow) > L_percentile), # Filtra solo gli outlier
+               aes(x = Target, y = Source), # Mappa le stesse coordinate
+               shape = "x", # Il simbolo "x"
+               color = "black", # Colore del simbolo
+               size = 4, # Dimensione del simbolo
+               stroke = 1) + # Spessore del bordo del simbolo
+    
+    labs(title = "Matrice di Flusso Netto (Triangolo Superiore - Flusso Trimmato)",
+         subtitle = "Blu: Riga cita Colonna di più | Rosso: Colonna cita Riga di più") + 
+    
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+          axis.title = element_blank(),
+          legend.position = "right")
+```
+
+## Challenge 2: Normalizzazione del Flusso (Calcolo di $E$) e Challenge 3
+
+Challenge 2: Normalizzazione del Flusso (Calcolo di $E$)
+Cosa fare: Calcolare la matrice di flusso atteso ($E$), dove l'entrata $E_{i,j}$ rappresenta il flusso atteso da $i$ a $j$ se le citazioni fossero distribuite in modo casuale, ma mantenendo i totali di riga ($out_i$) e colonna ($in_j$) osservati.$$\text{Flusso atteso da } i \text{ a } j: \quad E_{i,j} = \frac{out_i \cdot in_j}{n}$$Termini:$out_i$: Totale delle citazioni in uscita dalla disciplina $i$ (somma della riga $i$ di $F$).$in_j$: Totale delle citazioni in entrata nella disciplina $j$ (somma della colonna $j$ di $F$).$n$: Il totale complessivo delle citazioni nella matrice $F$.
+
+```{r}
+# Calcola n (il totale di tutte le citazioni)
+n = sum(F)
+```
+
+Ora calcolo E, ovvero Devo moltiplicare ogni elemento del vettore $out$ per ogni elemento del vettore $in$ e dividere il risultato per $n$.
+
+```{r}
+# Calcola il prodotto esterno (outer product) dei vettori out_flow e in_flow
+# Questo crea una matrice dove E[i,j] = out_flow[i] * in_flow[j]
+E_numerator = outer(out_flow, in_flow) 
+
+E = E_numerator/n
+
+# Controlla che le dimensioni di E siano corrette (dovrebbe essere ndisc x ndisc)
+# dim(E)
+```
+
+Calcoliamo lo Z-SCORE
+Il valore $Z_{i,j}$ (Z-score) misura la deviazione standard tra il flusso osservato ($F$) e il flusso atteso ($E$).
+$Z_{i,j} > 0$ (Positivo): Indica che la citazione da $i$ a $j$ è maggiore di quanto ci si aspetterebbe (sovracitazione, attrazione).
+$Z_{i,j} < 0$ (Negativo): Indica che la citazione da $i$ a $j$ è minore di quanto ci si aspetterebbe (sottocitazione, repulsione/autarchia).
+
+```{r}
+# Calcola la differenza tra osservato e atteso
+F_minus_E = F - E
+
+# Calcola il denominatore (radice quadrata di E)
+sqrt_E = sqrt(E)
+
+# Calcola la Matrice Normalizzata Z (X-test)
+Z_matrix = F_minus_E / sqrt_E
+
+# Gestione Numerica: Sostituisci i valori infiniti o NaN (che possono derivare da E=0) con 0
+Z_matrix[is.infinite(Z_matrix)] = 0
+Z_matrix[is.nan(Z_matrix)] = 0
+
+# Assegna i nomi per il melting (assumiamo che 'disc' contenga i nomi)
+rownames(Z_matrix) = disc
+colnames(Z_matrix) = disc
+
+# Trasforma la matrice Z in formato lungo
+Z_long = melt(Z_matrix)
+colnames(Z_long) = c("Source", "Target", "Z_Score")
+
+# Calcola il 95° percentile dei valori Z assoluti
+Lz_percentile = quantile(abs(Z_long$Z_Score), probs = 0.95)
+# Il limite della scala sarà c(-Lz, Lz)
+
+```
+
+### Grafo e visualizzazione
+
+```{r}
+ggplot(Z_long, aes(x = Source, y = Target, fill = Z_Score)) +
+    geom_tile() +
+    
+    # Scala divergente: mostra se il flusso è > atteso (Blu) o < atteso (Rosso)
+    scale_fill_gradient2(
+        low = "blue", mid = "white", high = "red",
+        midpoint = 0, 
+        limit = c(-Lz_percentile, Lz_percentile), # Limiti basati sul percentile
+        oob = scales::squish, # Schiaccia gli outlier sui colori estremi
+        space = "Lab", name = "Z-Score") +
+  
+   # --- AGGIUNGI IL SECONDO GEOM (geom_point) per rendere chiara graficamente le intersezioni outlier
+    geom_point(data = Z_long %>% filter(abs(Z_Score) > Lz_percentile), # Filtra solo gli outlier
+               aes(x = Target, y = Source), # Mappa le stesse coordinate
+               shape = "x", # Il simbolo "x"
+               color = "black", # Colore del simbolo
+               size = 4, # Dimensione del simbolo
+               stroke = 1) + # Spessore del bordo del simbolo
+    
+    # Rotazione e titoli
+    labs(title = "Flusso Residuale (Z-Score): Citazioni Osservate vs. Attese",
+         subtitle = "Rosso: Sovracitazione | Blu: Sottocitazione") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+          axis.title = element_blank())
+```
+```{r}
+# Soglia di esempio (Z > 3 o Z < -3)
+
+
+# 1. Filtra per SOVRACITAZIONE (Attrazione: F > E)
+Attraction_Flows = Z_long %>%
+    filter(Z_Score >= 0) 
+
+# 2. Filtra per SOTTOCITAZIONE (Repulsione: F < E)
+Repulsion_Flows = Z_long %>%
+    filter(Z_Score <= 0 )
+
+# Calcola i quartili (Q1, Q2, Q3) del Flusso Netto
+quartili_flusso_Attraction = quantile(Attraction_Flows$Z_Score, probs = c(0.25, 0.50, 0.75))
+# Stampa i risultati
+print(quartili_flusso_Attraction)
+
+quartili_flusso_Repulsion = quantile(Repulsion_Flows$Z_Score, probs = c(0.25, 0.50, 0.75))
+print(quartili_flusso_Repulsion)
+
+threshold_UP = 0
+threshold_LOW = 0
+
+# 1. Filtra per SOVRACITAZIONE (Attrazione: F > E)
+Attraction_Flows = Z_long %>%
+    filter(Z_Score >= 138) 
+
+# 2. Filtra per SOTTOCITAZIONE (Repulsione: F < E)
+Repulsion_Flows = Z_long %>%
+    filter(Z_Score <= -173 )
+
+```
+
+```{r}
+library(igraph)
+library(ggraph)
+
+# Crea il grafo orientato dai dati filtrati (Sovracitazione)
+g_attraction = graph_from_data_frame(d = Attraction_Flows, directed = TRUE)
+Layout= layout_with_kk(g_attraction)
+
+ggraph(g_attraction, layout= Layout) +
+  geom_node_point(color = "lightblue", size = 4) +
+  geom_edge_fan(arrow = arrow(length = unit(3, 'mm')), # Aggiunge la punta della freccia
+                  end_cap = circle(3, 'mm'), # La freccia parte fuori dal nodo
+                  aes(alpha = Z_Score), # Trasparenza
+                  colour = "black") + # Colore grigio per l'attrazione
+  # 'repel = TRUE' è fondamentale per evitare che le etichette si sovrappongano
+  geom_node_text(aes(label = name), repel = TRUE, size = 3.5) + 
+  # 6. Pulisci il tema (rimuove assi, sfondi, ecc.)
+  theme_void() +
+  # Aggiungi un titolo
+  labs(title = "Rete di sovracitazioni")
+  
+
+```
+```{r}
+# Crea il grafo orientato dai dati filtrati (Sovracitazione)
+g_attraction = graph_from_data_frame(d = Repulsion_Flows, directed = TRUE)
+Layout= layout_with_kk(g_attraction)
+
+ggraph(g_attraction, layout= Layout) +
+  geom_node_point(color = "lightblue", size = 3) +
+  geom_edge_fan(arrow = arrow(length = unit(3, 'mm')), # Aggiunge la punta della freccia
+                  end_cap = circle(3, 'mm'), # La freccia parte fuori dal nodo
+                  aes(alpha= -Z_Score), # Trasparenza
+                  colour = "black") + # Colore per l'attrazione
+  # 'repel = TRUE' è fondamentale per evitare che le etichette si sovrappongano
+  geom_node_text(aes(label = name), repel = TRUE, size = 3.5) + 
+  # 6. Pulisci il tema (rimuove assi, sfondi, ecc.)
+  theme_void() +
+  # Aggiungi un titolo
+  labs(title = "Rete di sottocitazioni")
+```
+
+## Challenge 4: Scoprire l'interdisciplinarità (RAO QUADRATICO)
+
+Cosa fare: Calcolare l'indice di Entropia Quadratica di Rao per ciascuna disciplina. Questo indice viene tipicamente utilizzato per misurare l'interdisciplinarità di una disciplina: maggiore è il valore, più la disciplina cita (o è citata) da un vasto e diversificato insieme di altre discipline.
+
+L'obiettivo è scoprire le discipline più interdisciplinari utilizzando l'Entropia Quadratica di Rao.L'entropia di Rao non ha una formula singola e semplice come il test Z, ma nel contesto delle matrici di flusso, l'idea è che una disciplina è più interdisciplinare se le sue citazioni in uscita ($out_i$) sono distribuite in modo uniforme (cioè, citano molte altre discipline in modo equilibrato), considerando anche una "distanza" tra le discipline citate.
+
+Il principio concettuale dell'Entropia Quadratica di Rao ($R(p)$) si applica alla misurazione della diversità. La formula è:
+
+$$R(p) = \sum_{i=1}^{N} \sum_{j=1}^{N} d_{i j} p_{i} p_{j}$$
+
+Dove $d_{i j}$ è la dissimiglianza tra gli elementi e $p_i$ sono le probabilità di distribuzione.
+
+Ne consegue che, in generale:
+$R(p)$ è grande, quindi $p$ è eterogeneo, quando $p$ distribuisce uniformemente la sua probabilità tra elementi **dissimilari**.
+Al contrario, $p$ è omogeneo quando concentra la sua probabilità su elementi **similari**.
+
+Applicando $R(p)$ come misura di eterogeneità ai nodi di un grafo, si ha che:
+
+1.  R(p) è grande -> Un nodo è **eterogeneo** quando distribuisce uniformemente la sua **forza** (peso degli archi) tra vicini **dissimilari**.
+2.  R(p) è piccola -> Un nodo è **omogeneo** quando concentra la sua **forza** su vicini **similari**.
+
+```{r}
+# ndisc è il numero di discipline
+ndisc = length(disc) 
+
+# Crea la matrice di dissimiglianza binaria D
+D = matrix(1, nrow = ndisc, ncol = ndisc)
+diag(D) = 0
+
+# Matrice di Probabilità P
+# Applica la divisione riga per riga: P[i,j] = F[i,j] / out_flow[i]
+P = F / out_flow
+#non eseguo il controllo perche tutti citano tutti -> P[is.na(P)] = 0
+
+ndisc_P = nrow(P)
+rao_index = numeric(ndisc_P)
+
+for (i in 1:ndisc_P) {
+  # p_i è il vettore di probabilità di citazione in uscita per la disciplina i
+  p_i = P[i, ] 
+  
+  # Calcola l'indice di Rao
+  rao_index[i] = rao(p_i, D) 
+}
+
+# Assegno i nomi alle discipline
+names(rao_index) = disc
+
+# DataFrame riepilogativo
+Rao_Summary = data.frame(
+  Disciplina = disc,
+  Rao_Index = rao_index
+)
+```
+
+Visualizzazione grafica
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Ordina il DataFrame in modo decrescente
+Rao_Summary_Ordered = Rao_Summary %>%
+    arrange(desc(Rao_Index))
+
+# Crea il grafico a barre orizzontali
+ggplot(Rao_Summary_Ordered, 
+       aes(x = reorder(Disciplina, Rao_Index), y = Rao_Index)) +
+    
+    geom_bar(stat = "identity", fill = "#009E73") + 
+    coord_flip() + 
+    
+    labs(title = "Classifica dell'Interdisciplinarità (Indice di Rao)",
+         subtitle = "Indice di Rao maggiore = Interdisciplinarità maggiore",
+         x = NULL, 
+         y = "Indice di Rao (Diversità)") +
+    
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 8))
+```
+
+
+
+"The more uniform is $p$, the more heterogeneous is $p$.
+
+L'interdisciplinarità di una disciplina viene misurata tramite l'Entropia Quadratica di Rao ($R(p)$), che tiene conto dell'uniformità della distribuzione di citazione.Dato che la distanza ($d_{i,j}$) è considerata binaria ($1$ per $i \neq j$, $0$ per $i = j$), la formula si semplifica nell'Indice di Gini-Simpson e dipende solo dalla probabilità di citazione in uscita:$$R(p) = 1 - \sum_{j} p_{j}^2$$Vettore di Probabilità ($p_k$): È la riga $k$ della matrice $P$, dove $p_{k,j} = F_{k,j} / out_k$.
+
+
+Interpretazione:
+
+$R(p)$ grande (vicino a 1): Alta eterogeneità / Interdisciplinarità: "Se $p$ è uniforme (la disciplina cita tutte le altre in modo equilibrato), allora $\sum p_i^2$ è piccolo, e $R(p)$ è grande.
+
+$R(p)$ piccolo (vicino a 0): Alta omogeneità / Specializzazione: Se $p$ è concentrata (la disciplina cita quasi solo sé stessa o poche altre discipline), allora $\sum p_i^2$ è grande, e $R(p)$ è piccolo. Ciò indica alta omogeneità/specializzazione.
+
+Quindi la materia più interdisciplinare è la ingengeria industriale, mentre quella più specializzata è la matematica

@@ -31,13 +31,13 @@ $$
 
 Il progetto utilizza R come linguaggio di analisi e le librerie `igraph` e `dplyr`.
 
-I file di input necessari sono:
+I file di input necessari sono nella cartella `dataset`:
 
 | File | Descrizione | Formato |
 | :--- | :--- | :--- |
-| `flows.txt` | Matrice dei flussi di citazioni **assoluti** ($F$). | Numerico (una riga per riga della matrice) |
-| `disciplines.txt` | Nomi delle discipline (nodi della rete). | Caratteri (uno per riga) |
-| `size.txt` | Dimensione di ciascuna disciplina (numero di articoli). | Numerico (uno per riga) |
+| `dataset/Flows` | Matrice dei flussi di citazioni **assoluti** ($F$). | Numerico (una riga per riga della matrice) |
+| `dataset/Disciplines` | Nomi delle discipline (nodi della rete). | Caratteri (uno per riga) |
+| `dataset/Size` | Dimensione di ciascuna disciplina (numero di articoli). | Numerico (uno per riga) |
 
 ## 🚀 Obiettivi del Progetto (Challenges)
 
@@ -64,5 +64,5 @@ Il codice R (`Interdisciplinarity_and_hierachity.Rmd`) è stato sviluppato per a
     ```r
     install.packages(c("igraph", "dplyr"))
     ```
-3.  **Dati:** Posizionare i file `flows.txt`, `disciplines.txt` e `size.txt` nella stessa directory del file `.Rmd`.
+3.  **Dati:** I file di dati (`Disciplines`, `Flows` e `Size`) sono già organizzati nella cartella `dataset`.
 4.  **Esecuzione:** Aprire il file `.Rmd` in RStudio e fare clic su **Knit** per generare il report HTML completo contenente tutti i passaggi, le spiegazioni e i risultati delle analisi.

@@ -29,9 +29,9 @@ library(dplyr)
 Analizzare il flusso di citazioni tra discipline per quantificare interdisciplinarità e autarchia, confrontando il flusso osservato ($F$) con il flusso atteso casualmente ($E$).
 
 ## Dataset (Input)
-* Nomi delle discipline (`disciplines.txt`)
-* Dimensione delle discipline (numero di paper, `size.txt`)
-* Matrice di flusso delle citazioni assolute ($F$) tra discipline (`flows.txt`)
+* Nomi delle discipline (`dataset/Disciplines`)
+* Dimensione delle discipline (numero di paper, `dataset/Size`)
+* Matrice di flusso delle citazioni assolute ($F$) tra discipline (`dataset/Flows`)
     * $F_{i,j}$ è il numero di citazioni dalla disciplina $i$ alla disciplina $j$.
 
 ## Challenge da Risolvere
@@ -60,14 +60,14 @@ rao = function(p, D) {
 
 ```{r}
 # Nomi delle discipline
-disc = scan("Disciplines", what = character(0), sep="\n")
+disc = scan("dataset/Disciplines", what = character(0), sep="\n")
 ndisc = length(disc)
 
 # Dimensione delle discipline (numero di paper)
-size_disc = scan("Size", what = numeric(0), sep="\n")
+size_disc = scan("dataset/Size", what = numeric(0), sep="\n")
 
 # Matrice di flusso (entry in position (i,j) are citations from i to j)
-F = matrix(scan("Flows", what = numeric(0), sep=","), 
+F = matrix(scan("dataset/Flows", what = numeric(0), sep=","), 
            nrow = ndisc, ncol = ndisc, byrow = TRUE) # Assumiamo byrow = TRUE per default
 
 ```
